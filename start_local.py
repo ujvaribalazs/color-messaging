@@ -87,7 +87,7 @@ def main():
         processes.append(stats_process)
 
         # Végül elindítjuk a színgeneráló klienst
-        producer_process = start_service("color_producer.py", "Color Producer")
+        producer_process = start_service("color_producer_soap.py", "Color Producer")
         processes.append(producer_process)
 
         logger.info("All services started. Press Ctrl+C to stop.")

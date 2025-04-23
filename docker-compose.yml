@@ -27,7 +27,7 @@ services:
 
   color_producer:
     build: .
-    command: python color_producer.py
+    command: python color_producer_soap.py
     environment:
       - SOAP_WSDL_URL=http://soap_service:8000/?wsdl
     depends_on:
