@@ -1,12 +1,13 @@
 import pika
 import logging
+import multiprocessing
 
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("mdb_blue")
+logger = logging.getLogger("color_processor")
 
 # RabbitMQ kapcsolati adatok
-RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
+RABBITMQ_HOST = 'localhost'
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = 'guest'
 RABBITMQ_PASSWORD = 'guest'
@@ -14,17 +15,10 @@ COLOR_QUEUE = 'colorQueue'
 STATISTICS_QUEUE = 'colorStatistics'
 
 
-class BlueMessageProcessor:
-    """
-    A kék üzeneteket feldolgozó komponens.
-    """
-
-    def __init__(self):
-        """
-        Inicializálja a komponenst és a számlálót.
-        """
+class ColorMessageProcessor:
+    def __init__(self, color):
         self.message_count = 0
-        self.color = "BLUE"
+        self.color = color
 
         # Kapcsolódás a RabbitMQ-hoz
         self.connection = pika.BlockingConnection(
@@ -36,14 +30,12 @@ class BlueMessageProcessor:
         )
         self.channel = self.connection.channel()
 
-        # Üzenetsorok létrehozása, ha még nem léteznek
+        # Üzenetsorok létrehozása
         self.channel.queue_declare(queue=COLOR_QUEUE)
         self.channel.queue_declare(queue=STATISTICS_QUEUE)
 
-        # Beállítjuk, hogy egyszerre csak egy üzenetet dolgozzon fel
+        # QoS és feliratkozás
         self.channel.basic_qos(prefetch_count=1)
-
-        # Feliratkozás az üzenetsorra a megfelelő szűrővel
         self.channel.basic_consume(
             queue=COLOR_QUEUE,
             on_message_callback=self.process_message,
@@ -53,18 +45,10 @@ class BlueMessageProcessor:
         logger.info(f"{self.color} Message Processor started. Waiting for messages...")
 
     def process_message(self, ch, method, properties, body):
-        """
-        Feldolgozza a beérkező üzeneteket.
-
-        :param ch: A csatorna
-        :param method: Az üzenet metódusa
-        :param properties: Az üzenet tulajdonságai
-        :param body: Az üzenet tartalma
-        """
         message = body.decode('utf-8')
         logger.info(f"MDB {self.color} received message: {message}")
 
-        # Csak a kék üzeneteket dolgozzuk fel
+        # Csak a megfelelő színű üzeneteket dolgozzuk fel
         if message == self.color:
             logger.info(f"Processing {self.color} message")
             self.message_count += 1
@@ -79,9 +63,6 @@ class BlueMessageProcessor:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def send_statistics(self):
-        """
-        Statisztikát küld a statisztikai üzenetsorba.
-        """
         statistic_message = f"10 '{self.color}' messages has been processed"
 
         self.channel.basic_publish(
@@ -93,19 +74,42 @@ class BlueMessageProcessor:
         logger.info(f"Sent statistics: {statistic_message}")
 
     def start(self):
-        """
-        Elindítja az üzenetfeldolgozást.
-        """
         self.channel.start_consuming()
+
+    def stop(self):
+        if self.connection.is_open:
+            self.channel.stop_consuming()
+            self.connection.close()
+            logger.info(f"{self.color} processor connection closed")
+
+
+def processor_thread(color):
+    processor = ColorMessageProcessor(color)
+    try:
+        processor.start()
+    except Exception as e:
+        logger.error(f"Error in {color} processor: {e}")
+    finally:
+        processor.stop()
 
 
 if __name__ == "__main__":
-    processor = BlueMessageProcessor()
+    # Létrehozzuk a három folyamatot a három színnek
+    processes = []
+    for color in ["RED", "GREEN", "BLUE"]:
+        process = multiprocessing.Process(target=processor_thread, args=(color,))
+        processes.append(process)
+        process.start()
+        logger.info(f"Started {color} processor process")
+
+    # Várunk amíg a főprogram fut
     try:
-        processor.start()
+        # A főfolyamat addig fut, amíg a felhasználó meg nem szakítja
+        for process in processes:
+            process.join()
     except KeyboardInterrupt:
-        logger.info("Stopping processor...")
-    finally:
-        if processor.connection.is_open:
-            processor.connection.close()
-            logger.info("Connection closed")
+        logger.info("Stopping all processors...")
+        for process in processes:
+            process.terminate()
+
+    logger.info("All processors stopped")

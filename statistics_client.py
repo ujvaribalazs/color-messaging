@@ -10,7 +10,7 @@ RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = 'guest'
 RABBITMQ_PASSWORD = 'guest'
-STATISTICS_QUEUE = '/queue/colorStatistics'
+STATISTICS_QUEUE = 'colorStatistics'
 
 
 # noinspection PyMethodMayBeStatic

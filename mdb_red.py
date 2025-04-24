@@ -10,8 +10,8 @@ RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = 'guest'
 RABBITMQ_PASSWORD = 'guest'
-COLOR_QUEUE = '/queue/colorQueue'
-STATISTICS_QUEUE = '/queue/colorStatistics'
+COLOR_QUEUE = 'colorQueue'
+STATISTICS_QUEUE = 'colorStatistics'
 
 
 class RedMessageProcessor:
@@ -40,13 +40,13 @@ class RedMessageProcessor:
         self.channel.queue_declare(queue=COLOR_QUEUE)
         self.channel.queue_declare(queue=STATISTICS_QUEUE)
 
-        # Beállítjuk, hogy egyszerre csak egy üzenetet dolgozzon fel
+        # Beállítjuk, hogy egyszerre csak egy üzenetet dolgozzon fel, (nem vesz ki újat, amíg az előzőt nem nyugtázta)
         self.channel.basic_qos(prefetch_count=1)
 
         # Feliratkozás az üzenetsorra a megfelelő szűrővel
         self.channel.basic_consume(
             queue=COLOR_QUEUE,
-            on_message_callback=self.process_message,
+            on_message_callback=self.process_message, # Ez a callback függvény, amelyet a RabbitMQ hív meg, amikor új üzenet érkezik
             auto_ack=False
         )
 
@@ -61,7 +61,7 @@ class RedMessageProcessor:
         :param properties: Az üzenet tulajdonságai
         :param body: Az üzenet tartalma
         """
-        message = body.decode('utf-8')
+        message = body.decode('utf-8') # Dekódolja az üzenetet UTF-8 kódolással (a body egy byte tömb)
         logger.info(f"MDB {self.color} received message: {message}")
 
         # Csak a piros üzeneteket dolgozzuk fel
@@ -97,6 +97,17 @@ class RedMessageProcessor:
         Elindítja az üzenetfeldolgozást.
         """
         self.channel.start_consuming()
+
+        """
+        Az alkalmazás fő szálát blokkolja. A kód ezen a ponton "megáll", és egy végtelen ciklusba lép, ahol a RabbitMQ kapcsolatot figyeli új üzenetekre.
+        A callback használata: A callback (process_message) valóban aszinkron abban az értelemben, hogy akkor hívódik meg, amikor egy üzenet érkezik, nem pedig előre meghatározott időközönként. Azonban maga a callback mechanizmus egy szinkron, blokkolt környezetben működik.
+        Hogyan működik ez? A start_consuming() hívás után a pika könyvtár belső hurkot indít, amely:
+        
+        Folyamatosan figyeli a RabbitMQ kapcsolatot
+        Amikor üzenet érkezik, meghívja a megadott callback függvényt
+        A callback végrehajtása után visszatér a figyelő hurokhoz
+        Ez a hurok addig fut, amíg meg nem szakítják (pl. KeyboardInterrupt kivétellel)
+        """
 
 
 if __name__ == "__main__":

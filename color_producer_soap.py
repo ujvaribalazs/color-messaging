@@ -1,7 +1,7 @@
 import random
 import time
 import logging
-from zeep import Client
+from zeep import Client # a Zeep egy Python-alapú SOAP kliens könyvtár, ez generálja a szükséges proxy osztályokat
 
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -23,7 +23,7 @@ def generate_random_color():
 
 def run_color_producer():
     """
-    Színeket küld a SOAP webszolgáltatásnak másodpercenként.
+    Színeket küld a SOAP webszolgáltatásnak time.sleep( ... ) időnként.
     """
     client = Client(SOAP_WSDL_URL)
 
@@ -35,12 +35,12 @@ def run_color_producer():
             color = generate_random_color()
 
             # Szín küldése a SOAP szolgáltatásnak
-            response = client.service.send_color(color)
+            response = client.service.send_color_to_queue(color)
 
             logger.info(f"Sent color: {color}, Response: {response}")
 
             # Várunk 1 másodpercet a következő küldésig
-            time.sleep(1)
+            time.sleep(.1)
 
         except Exception as e:
             logger.error(f"Error sending color: {e}")
