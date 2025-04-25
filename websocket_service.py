@@ -14,7 +14,7 @@ RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = 'guest'
 RABBITMQ_PASSWORD = 'guest'
-COLOR_QUEUE = '/queue/colorQueue'  # Visszaállítottuk az eredeti névformátumot
+COLOR_QUEUE = 'colorQueue'  # Visszaállítottuk az eredeti névformátumot
 
 # Létrehozunk egy thread pool executort a blokkoló műveletek számára
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)

@@ -11,12 +11,34 @@ RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = 'guest'
 RABBITMQ_PASSWORD = 'guest'
-COLOR_QUEUE = 'colorQueue'
+# COLOR_QUEUE = 'colorQueue'
 
 app = Flask(__name__)
 
 
+def setup_queues():
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        )
+    )
+    channel = connection.channel()
+    channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
+
+    colors = ['red', 'green', 'blue']
+    for color in colors:
+        queue_name = f'queue_{color}'
+        routing_key = f'color.{color}'
+        channel.queue_declare(queue=queue_name)
+        channel.queue_bind(exchange='color_exchange', queue=queue_name, routing_key=routing_key)
+
+    connection.close()
+
 @app.route('/api/colors', methods=['POST'])
+
+
 def send_color():
     """
     Színeket fogad REST API-n keresztül és továbbítja őket az üzenetsorba.
@@ -47,17 +69,17 @@ def send_color():
         )
         channel = connection.channel()
 
-        # Üzenetsor létrehozása, ha még nem létezik
-        channel.queue_declare(queue=COLOR_QUEUE)
+        # Exchange létrehozása (ha még nincs)
+        channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
 
-        # Üzenet küldése az üzenetsorba
+        # Üzenet küldése az exchange-be szín szerint
+        routing_key = f"color.{color.lower()}"  # pl. color.red
         channel.basic_publish(
-            exchange='',
-            routing_key=COLOR_QUEUE,
+            exchange='color_exchange',
+            routing_key=routing_key,
             body=color
         )
 
-        # Kapcsolat lezárása
         connection.close()
 
         return jsonify({
@@ -81,5 +103,6 @@ def get_colors():
 
 
 if __name__ == "__main__":
+    setup_queues()
     logger.info("REST API Service started at http://localhost:5000")
     app.run(host='0.0.0.0', port=5000)

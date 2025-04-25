@@ -1,6 +1,7 @@
 import pika
 import logging
 import threading
+import time
 
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -45,6 +46,15 @@ class ColorMessageProcessor:
         logger.info(f"{self.color} Message Processor started. Waiting for messages...")
 
     def process_message(self, ch, method, properties, body):
+
+        """
+        Paraméter   | Mit jelent?                                                   | Mi tölti fel?
+        ch          | a channel objektum, amin az üzenet érkezett                   | RabbitMQ tölti
+        method      | üzenet metaadatai, pl. delivery_tag (az üzenet azonosítója)   | RabbitMQ tölti
+        properties  | üzenet tulajdonságai (pl. fejlécek, user-defined dolgok)      | RabbitMQ tölti
+        body        | maga az üzenet tartalma | RabbitMQ tölti
+        """
+
         message = body.decode('utf-8')
         logger.info(f"MDB {self.color} received message: {message}")
 
@@ -53,14 +63,16 @@ class ColorMessageProcessor:
             logger.info(f"Processing {self.color} message")
             self.message_count += 1
 
+
             # Ha elértük a 10 üzenetet, statisztikát küldünk
             if self.message_count % 10 == 0:
                 self.send_statistics()
         else:
-            logger.info(f"Ignoring {message} message (not {self.color})")
-
+            logger.info(f"Ignoring {message} message (not {self.color}), requeuing...")
+            # Nem az én üzenetem, visszarakjuk
         # Nyugtázzuk az üzenet feldolgozását
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
     def send_statistics(self):
         statistic_message = f"10 '{self.color}' messages has been processed"
@@ -107,7 +119,6 @@ if __name__ == "__main__":
     try:
         # A főszál addig fut, amíg a felhasználó meg nem szakítja
         while True:
-            import time
 
             time.sleep(1)
     except KeyboardInterrupt:
