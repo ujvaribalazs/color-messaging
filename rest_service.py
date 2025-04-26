@@ -17,7 +17,7 @@ app = Flask(__name__)
 
 
 @app.route('/api/colors', methods=['POST'])
-def send_color():
+def send_color_to_queue():
     """
     Színeket fogad REST API-n keresztül és továbbítja őket az üzenetsorba.
     A kérés formátuma: {"color": "RED"} (vagy GREEN, BLUE)
