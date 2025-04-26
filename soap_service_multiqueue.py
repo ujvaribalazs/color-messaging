@@ -1,3 +1,4 @@
+import os
 import logging
 from wsgiref.simple_server import make_server  #WSGI szerver
 # a SOAP szolgáltatásokat mindig valamilyen HTTP szerveren keresztül kell elérhetővé tenni,
@@ -34,12 +35,12 @@ logger = logging.getLogger("soap_service")
      Összekapcsoljuk a szolgáltatást egy WSGI-kompatibilis webszerverrel
 """
 
-# RabbitMQ kapcsolati adatok
-RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
-RABBITMQ_PORT = 5672
-RABBITMQ_USER = 'guest'
-RABBITMQ_PASSWORD = 'guest'
-COLOR_QUEUE = 'colorQueue'
+
+# RabbitMQ kapcsolati adatok környezeti változókból
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASS', 'guest')
 
 def setup_queues():
     connection = pika.BlockingConnection(
@@ -121,8 +122,7 @@ class ColorService(ServiceBase):
 
 
 
-            # Kapcsolat lezárása
-            connection.close()
+
 
             return f"Color {color} successfully sent to the message queue"
         except Exception as e:
@@ -149,8 +149,8 @@ def run_soap_server():
 
     # WSGI szerver elindítása
     server = make_server('0.0.0.0', 8000, wsgi_application)
-    logger.info("SOAP Service started at http://localhost:8000")
-    logger.info("WSDL available at http://localhost:8000/?wsdl")
+    logger.info(f"SOAP Service started at http://0.0.0.0:8000")
+    logger.info(f"WSDL available at http://0.0.0.0:8000/?wsdl")
 
     server.serve_forever()
 

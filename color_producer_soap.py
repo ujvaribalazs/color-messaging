@@ -1,14 +1,17 @@
 import random
 import time
 import logging
-from zeep import Client # a Zeep egy Python-alapú SOAP kliens könyvtár, ez generálja a szükséges proxy osztályokat
+import os
+from zeep import Client
 
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("color_producer")
 
-# SOAP szolgáltatás elérhetősége
-SOAP_WSDL_URL = 'http://localhost:8000/?wsdl'  # Docker környezetben ez 'http://soap_service:8000/?wsdl' lesz
+# SOAP szolgáltatás elérhetősége környezeti változókkal
+SOAP_HOST = os.environ.get('SOAP_SERVICE_HOST', 'localhost')
+SOAP_PORT = os.environ.get('SOAP_SERVICE_PORT', '8000')
+SOAP_WSDL_URL = f'http://{SOAP_HOST}:{SOAP_PORT}/?wsdl'
 
 
 def generate_random_color():
@@ -25,6 +28,7 @@ def run_color_producer():
     """
     Színeket küld a SOAP webszolgáltatásnak time.sleep( ... ) időnként.
     """
+    logger.info(f"Connecting to SOAP service at {SOAP_WSDL_URL}")
     client = Client(SOAP_WSDL_URL)
 
     logger.info("Color Producer started. Sending random colors to SOAP service...")
@@ -39,8 +43,8 @@ def run_color_producer():
 
             logger.info(f"Sent color: {color}, Response: {response}")
 
-            # Várunk 1 másodpercet a következő küldésig
-            time.sleep(.1)
+            # Várunk 0.1 másodpercet a következő küldésig
+            time.sleep(1)
 
         except Exception as e:
             logger.error(f"Error sending color: {e}")

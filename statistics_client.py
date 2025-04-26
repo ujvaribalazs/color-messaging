@@ -1,3 +1,4 @@
+import os
 import pika
 import logging
 
@@ -6,10 +7,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("statistics_client")
 
 # RabbitMQ kapcsolati adatok
-RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
-RABBITMQ_PORT = 5672
-RABBITMQ_USER = 'guest'
-RABBITMQ_PASSWORD = 'guest'
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASS', 'guest')
 STATISTICS_QUEUE = 'colorStatistics'
 
 
