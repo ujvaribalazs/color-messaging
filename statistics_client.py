@@ -5,6 +5,7 @@ import logging
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("statistics_client")
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 # RabbitMQ kapcsolati adatok
 RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')

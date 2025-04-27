@@ -7,6 +7,7 @@ import time
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("color_processor")
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 # RabbitMQ kapcsolati adatok
 RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')

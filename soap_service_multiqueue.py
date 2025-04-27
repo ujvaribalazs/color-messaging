@@ -26,6 +26,7 @@ from spyne.server.wsgi import WsgiApplication # WSGI kompatibilis alkalmazás-wr
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("soap_service")
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 """Együtt ezek az importok lehetővé teszik, hogy:
 

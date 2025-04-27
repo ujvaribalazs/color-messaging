@@ -41,22 +41,22 @@ services:
       - RABBITMQ_PASS=guest
     restart: on-failure
 
-  color_producer:
-    build: .
-    command: >
-      bash -c "
-        echo 'Waiting for SOAP service to be ready...' &&
-        sleep 30 &&
-        python color_producer_soap.py
-      "
-    depends_on:
-      - soap_service
-    networks:
-      - app-network
-    environment:
-      - SOAP_SERVICE_HOST=soap_service
-      - SOAP_SERVICE_PORT=8000
-    restart: on-failure
+#  color_producer:
+#    build: .
+#    command: >
+#      bash -c "
+#        echo 'Waiting for SOAP service to be ready...' &&
+#        sleep 30 &&
+#        python color_producer_soap.py
+#      "
+#    depends_on:
+#      - soap_service
+#    networks:
+#      - app-network
+#    environment:
+#      - SOAP_SERVICE_HOST=soap_service
+#      - SOAP_SERVICE_PORT=8000
+#    restart: on-failure
 
   worker:
     build: .
