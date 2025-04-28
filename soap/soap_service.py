@@ -1,3 +1,4 @@
+import os
 import logging
 from wsgiref.simple_server import make_server  #WSGI szerver
 # a SOAP szolgáltatásokat mindig valamilyen HTTP szerveren keresztül kell elérhetővé tenni,
@@ -25,6 +26,7 @@ from spyne.server.wsgi import WsgiApplication # WSGI kompatibilis alkalmazás-wr
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("soap_service")
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 """Együtt ezek az importok lehetővé teszik, hogy:
 
@@ -34,12 +36,13 @@ logger = logging.getLogger("soap_service")
      Összekapcsoljuk a szolgáltatást egy WSGI-kompatibilis webszerverrel
 """
 
-# RabbitMQ kapcsolati adatok
-RABBITMQ_HOST = 'localhost'  # Docker környezetben ez 'rabbitmq' lesz
-RABBITMQ_PORT = 5672
-RABBITMQ_USER = 'guest'
-RABBITMQ_PASSWORD = 'guest'
+# RabbitMQ kapcsolati adatok környezeti változókból
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASS', 'guest')
 COLOR_QUEUE = 'colorQueue'
+STATISTICS_QUEUE = 'colorStatistics'
 
 
 # noinspection PyMethodParameters
@@ -89,15 +92,22 @@ class ColorService(ServiceBase):
             (pl. üzenetsor létrehozása, üzenet küldése) ezen a csatornán keresztül történik.
             """
 
-            # Üzenetsor létrehozása, ha még nem létezik
+            # Üzenetsor létrehozása, ha még nem létezik, exchange deklarálása
+            channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
             channel.queue_declare(queue=COLOR_QUEUE)
+            # Bind the queue to the exchange with different routing keys
+            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='RED')
+            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='GREEN')
+            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='BLUE')
 
             # Üzenet küldése az üzenetsorba
             channel.basic_publish(
-                exchange='', # A névtelen exchange automatikusan az üzeneteket közvetlenül a megadott routing key nevű
-                             # üzenetsorba irányítja.
-                routing_key=COLOR_QUEUE,
-                body=color
+                exchange='color_exchange',  # Használjuk a deklarált exchange-et
+                routing_key=color,          # Szín mint routing key
+                body=color,       # Üzenet tartalom
+                properties=pika.BasicProperties(
+                    headers={'COLOR': color}  # Header-ben is küldjük a színt
+                )
             )
 
             # Kapcsolat lezárása

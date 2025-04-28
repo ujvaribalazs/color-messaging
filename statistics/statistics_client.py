@@ -15,6 +15,7 @@ RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASS', 'guest')
 STATISTICS_QUEUE = 'colorStatistics'
 
 
+
 # noinspection PyMethodMayBeStatic
 class StatisticsClient:
     """

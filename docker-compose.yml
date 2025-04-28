@@ -1,10 +1,11 @@
-version: '3'
+version: "3"
 
 networks:
   app-network:
     driver: bridge
 
 services:
+  # ---------- RabbitMQ ----------
   rabbitmq:
     image: rabbitmq:3-management
     ports:
@@ -19,13 +20,14 @@ services:
       retries: 5
       start_period: 15s
 
+  # ---------- SOAP service ----------
   soap_service:
     build: .
     command: >
       bash -c "
         echo 'Waiting for RabbitMQ to be ready...' &&
         sleep 20 &&
-        python soap_service_multiqueue.py
+        python soap/soap_service.py
       "
     ports:
       - "8000:8000"
@@ -41,30 +43,14 @@ services:
       - RABBITMQ_PASS=guest
     restart: on-failure
 
-#  color_producer:
-#    build: .
-#    command: >
-#      bash -c "
-#        echo 'Waiting for SOAP service to be ready...' &&
-#        sleep 30 &&
-#        python color_producer_soap.py
-#      "
-#    depends_on:
-#      - soap_service
-#    networks:
-#      - app-network
-#    environment:
-#      - SOAP_SERVICE_HOST=soap_service
-#      - SOAP_SERVICE_PORT=8000
-#    restart: on-failure
-
+  # ---------- worker (MDB) ----------
   worker:
     build: .
     command: >
       bash -c "
         echo 'Waiting for RabbitMQ to be ready...' &&
         sleep 25 &&
-        python multithread_mdbs_routing_keys.py
+        python mdb/multithr_sinlge_queue_mdbs_routing_key.py
       "
     depends_on:
       rabbitmq:
@@ -78,13 +64,14 @@ services:
       - RABBITMQ_PASS=guest
     restart: on-failure
 
+  # ---------- statistics ----------
   statistics:
     build: .
     command: >
       bash -c "
         echo 'Waiting for RabbitMQ to be ready...' &&
         sleep 25 &&
-        python statistics_client.py
+        python statistics/statistics_client.py
       "
     depends_on:
       rabbitmq:

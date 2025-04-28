@@ -1,0 +1,38 @@
+# ─── általános ──────────────────────────────────────
+.git
+.gitignore
+.dockerignore
+*.md
+*.toml
+*.lock
+
+# ─── virtuális környezetek ─────────────────────────
+.venv/
+env/
+venv/
+
+# ─── Python byte-code & cache ──────────────────────
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ─── IDE-/editor-fájlok ────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── tesztek, dokumentáció, jegyzetek ──────────────
+tests/
+docs/
+*.log
+*.cov
+coverage.xml
+
+# ─── OS-specifikus ─────────────────────────────────
+.DS_Store
+Thumbs.db
