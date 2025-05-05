@@ -43,8 +43,8 @@ def run_color_producer():
 
             logger.info(f"Sent color: {color}, Response: {response}")
 
-            # Várunk 0.1 másodpercet a következő küldésig
-            time.sleep(.5)
+            # Várunk valamennyi másodpercet a következő küldésig
+            time.sleep(1)
 
         except Exception as e:
             logger.error(f"Error sending color: {e}")

@@ -35,7 +35,7 @@ class ColorMessageProcessor:
         )
         self.channel = self.connection.channel()
 
-        # Exchange beállítása - ennek meg kell egyeznie a REST API oldalon használt exchange-el
+        # Exchange beállítása
         self.channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
 
         # Üzenetsor létrehozása és kötése az exchange-hez
@@ -65,22 +65,26 @@ class ColorMessageProcessor:
         ch          | a channel objektum, amin az üzenet érkezett                   | RabbitMQ tölti
         method      | üzenet metaadatai, pl. delivery_tag (az üzenet azonosítója)   | RabbitMQ tölti
         properties  | üzenet tulajdonságai (pl. fejlécek, user-defined dolgok)      | RabbitMQ tölti
-        body        | maga az üzenet tartalma | RabbitMQ tölti
+        body        | maga az üzenet tartalma                                       | RabbitMQ tölti
         """
 
         message = body.decode('utf-8')
-        logger.info(f"MDB {self.color} received message: {message}")
 
-        # A routing key alapján már csak a megfelelő színű üzenetek érkeznek ide,
-        # nem kell újra ellenőrizni
-        self.message_count += 1
-        
-        # Nyugtázzuk az üzenet feldolgozását
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        # Ellenőrizzük, hogy a megfelelő színű üzenet-e
+        if properties.headers and properties.headers.get('COLOR') == self.color:
+            logger.info(f"MDB {self.color} processing message: {message}")
+            self.message_count += 1
 
             # Ha elértük a 10 üzenetet, statisztikát küldünk
-        if self.message_count % 10 == 0:
-            self.send_statistics()
+            if self.message_count % 10 == 0:
+                self.send_statistics()
+
+            # Nyugtázzuk a feldolgozott üzenetet
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            logger.info(f"MDB {self.color} rejecting message: {message} (wrong color)")
+            # Visszautasítjuk az üzenetet, hogy visszakerüljön a sorba
+            ch.basic_reject(delivery_tag=method.delivery_tag, requeue=True)
         
 
     def send_statistics(self):
@@ -107,7 +111,7 @@ class ColorMessageProcessor:
 def processor_thread(color):
     processor = ColorMessageProcessor(color)
     try:
-        processor.start()
+        processor.start() # elindul a consume, ez blokkoló
     except Exception as e:
         logger.error(f"Error in {color} processor: {e}")
     finally:
