@@ -92,21 +92,19 @@ class ColorService(ServiceBase):
             (pl. üzenetsor létrehozása, üzenet küldése) ezen a csatornán keresztül történik.
             """
 
-            # Üzenetsor létrehozása, ha még nem létezik, exchange deklarálása
-            channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
-            channel.queue_declare(queue=COLOR_QUEUE)
-            # Bind the queue to the exchange with different routing keys
-            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='RED')
-            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='GREEN')
-            channel.queue_bind(exchange='color_exchange', queue=COLOR_QUEUE, routing_key='BLUE')
+
 
             # Üzenet küldése az üzenetsorba
+            # Csak a sor létrehozása
+            channel.queue_declare(queue=COLOR_QUEUE)
+
+            # Üzenet küldése a default exchange-en
             channel.basic_publish(
-                exchange='color_exchange',  # Használjuk a deklarált exchange-et
-                routing_key=color,          # Szín mint routing key
-                body=color,       # Üzenet tartalom
+                exchange='',  # Default exchange
+                routing_key=COLOR_QUEUE,  # A sor neve
+                body=color,
                 properties=pika.BasicProperties(
-                    headers={'COLOR': color}  # Header-ben is küldjük a színt
+                    headers={'COLOR': color}
                 )
             )
 

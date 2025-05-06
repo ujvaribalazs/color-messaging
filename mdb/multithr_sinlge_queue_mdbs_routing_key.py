@@ -23,7 +23,7 @@ class ColorMessageProcessor:
         self.message_count = 0
         self.color = color
         self.queue_name = COLOR_QUEUE  
-        self.routing_key = color  
+
 
         # Kapcsolódás a RabbitMQ-hoz
         self.connection = pika.BlockingConnection(
@@ -35,16 +35,11 @@ class ColorMessageProcessor:
         )
         self.channel = self.connection.channel()
 
-        # Exchange beállítása
-        self.channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
 
-        # Üzenetsor létrehozása és kötése az exchange-hez
+
+        # Üzenetsor létrehozása
         self.channel.queue_declare(queue=self.queue_name)
-        self.channel.queue_bind(
-            exchange='color_exchange',
-            queue=self.queue_name,
-            routing_key=self.routing_key
-        )
+
 
         # Statisztikai sor létrehozása
         self.channel.queue_declare(queue=STATISTICS_QUEUE)
