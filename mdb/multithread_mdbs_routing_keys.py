@@ -34,7 +34,7 @@ class ColorMessageProcessor:
         )
         self.channel = self.connection.channel()
 
-        # Exchange beállítása - ennek meg kell egyeznie a REST API oldalon használt exchange-el
+        # Exchange beállítása
         self.channel.exchange_declare(exchange='color_exchange', exchange_type='direct')
 
         # Üzenetsor létrehozása és kötése az exchange-hez

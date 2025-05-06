@@ -102,7 +102,7 @@ class ColorService(ServiceBase):
             channel.basic_publish(
                 exchange='color_exchange',
                 routing_key=routing_key,
-                body=color
+                body=color.upper()
             )
 
             connection.close()

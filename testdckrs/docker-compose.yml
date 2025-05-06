@@ -1,0 +1,125 @@
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  # ---------- RabbitMQ ----------
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  # ---------- SOAP service ----------
+  soap_service:
+    build:
+      context: ..
+      dockerfile: testdckrs/Dockerfile
+    command: >
+      bash -c "
+        echo 'Waiting for RabbitMQ to be ready...' &&
+        sleep 1 &&
+        python soap/soap_service.py
+      "
+    ports:
+      - "8000:8000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    restart: on-failure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000" ] # Egyszerű HTTP ellenőrzés
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+
+  # ---------- worker (MDB) ----------
+  worker:
+    build:
+      context: ..
+      dockerfile: testdckrs/Dockerfile
+    command: >
+      bash -c "
+        echo 'Waiting for RabbitMQ to be ready...' &&
+        sleep 1 &&
+        python mdb/multithread_mdbs_routing_keys.py
+      "
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    restart: on-failure
+
+  # ---------- statistics ----------
+  statistics:
+    build:
+      context: ..
+      dockerfile: testdckrs/Dockerfile
+    command: >
+      bash -c "
+        echo 'Waiting for RabbitMQ to be ready...' &&
+        sleep 2 &&
+        python statistics/statistics_client.py
+      "
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    restart: on-failure
+
+  # ---------- color producer service ----------
+  color_producer_service:
+    build:
+      context: ..
+      dockerfile: testdckrs/Dockerfile
+    command: >
+      bash -c "
+        echo 'Waiting for soap_service to be ready...' &&
+        sleep 1 &&
+        python soap/color_producer_soap.py
+      "
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      soap_service: # a soap_service függőség
+        condition: service_started
+    networks:
+      - app-network
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - SOAP_SERVICE_HOST=soap_service  # Fontos! A konténer neve lesz a hostnév
+      - SOAP_SERVICE_PORT=8000
+    restart: on-failure
