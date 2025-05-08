@@ -29,7 +29,7 @@ def run_color_producer():
     Színeket küld a SOAP webszolgáltatásnak time.sleep( ... ) időnként.
     """
     logger.info(f"Connecting to SOAP service at {SOAP_WSDL_URL}")
-    client = Client(SOAP_WSDL_URL)
+    client = Client(SOAP_WSDL_URL) # létrejön a proxy
 
     logger.info("Color Producer started. Sending random colors to SOAP service...")
 
