@@ -1,39 +1,41 @@
 import os
 import logging
-from wsgiref.simple_server import make_server  #WSGI szerver
-# a SOAP szolgáltatásokat mindig valamilyen HTTP szerveren keresztül kell elérhetővé tenni,
-# mivel XML üzeneteiket HTTP protokollon keresztül továbbítják.
+from wsgiref.simple_server import make_server  # WSGI szerver
 
-import pika # RabbitMQ kliens
+import pika  # RabbitMQ kliens
 
 from spyne import Application, ServiceBase, rpc, Unicode
-""" SOAP webszolgáltatások létrehozására szolgáló Python könyvtár
-    Application: A Spyne alkalmazás alaposztálya, amely összefogja a szolgáltatásokat, protokollokat és a szervert
-    ServiceBase: Alap osztály a webszolgáltatás definíciókhoz - a ColorService ebből származik
-    rpc: Dekorátor, amely megjelöli a függvényeket, hogy azok távoli eljáráshívást (Remote Procedure Call) valósítanak meg
-    Unicode: Adattípus definíció, amely meghatározza, hogy a paraméterek és visszatérési értékek szöveges adatok"""
+"""
+SOAP webszolgáltatások létrehozására szolgáló Python könyvtár.
+- Application: A Spyne alkalmazás alaposztálya, amely összefogja a szolgáltatásokat, protokollokat és a szervert.
+- ServiceBase: Alaposztály a webszolgáltatás definíciókhoz — a ColorService ebből származik.
+- rpc: Dekorátor, amely megjelöli a függvényeket, hogy azok távoli eljáráshívást (Remote Procedure Call) valósítanak meg.
+- Unicode: Adattípus definíció, amely meghatározza, hogy a paraméterek és visszatérési értékek szöveges adatok.
+"""
 
 from spyne.protocol.soap import Soap11
+"""
+A SOAP 1.1 protokoll implementációját importálja.
+Ez határozza meg, hogyan kell kódolni/dekódolni a SOAP XML kéréseket és válaszokat.
+"""
 
-"""A SOAP 1.1 protokoll implementációját importálja
-   Ez határozza meg, hogyan kell kódolni/dekódolni a SOAP XML kéréseket és válaszokat"""
-
-from spyne.server.wsgi import WsgiApplication # WSGI kompatibilis alkalmazás-wrapper
-
-""" Ez teszi lehetővé, hogy a SOAP szolgáltatás bármely WSGI-kompatibilis webszerverrel működhessen (mint pl. a wsgiref)
-    Hidat képez a SOAP alkalmazás és a HTTP webszerver között """
+from spyne.server.wsgi import WsgiApplication  # WSGI kompatibilis alkalmazás-wrapper
+"""
+Ez teszi lehetővé, hogy a SOAP szolgáltatás bármely WSGI-kompatibilis webszerverrel működhessen (mint pl. a wsgiref).
+Hidat képez a SOAP alkalmazás és a HTTP webszerver között.
+"""
 
 # Beállítjuk a naplózást
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("soap_service")
 logging.getLogger("pika").setLevel(logging.WARNING)
 
-"""Együtt ezek az importok lehetővé teszik, hogy:
-
-     Definiálunk egy szolgáltatást (ColorService)
-     Hozzáadjunk távoli eljáráshívásokat (@rpc dekorátorral)
-     Beállítsuk a SOAP protokollt
-     Összekapcsoljuk a szolgáltatást egy WSGI-kompatibilis webszerverrel
+"""
+Ezek az importok és beállítások lehetővé teszik, hogy:
+- Definiáljunk egy szolgáltatást (ColorService),
+- Hozzáadjunk távoli eljáráshívásokat (@rpc dekorátorral),
+- Beállítsuk a SOAP protokollt,
+- Összekapcsoljuk a szolgáltatást egy WSGI-kompatibilis webszerverrel.
 """
 
 # RabbitMQ kapcsolati adatok környezeti változókból
@@ -46,8 +48,42 @@ STATISTICS_QUEUE = 'colorStatistics'
 DLX_NAME = 'dlx'  # Dead-letter exchange neve
 DLQ_NAME = COLOR_QUEUE + '.dlq'  # Dead-letter queue neve
 
+# Globális RabbitMQ kapcsolat és csatorna
+connection = None
+channel = None
 
-# noinspection PyMethodParameters
+
+def setup_rabbitmq():
+    """
+    RabbitMQ kapcsolat és csatorna egyszeri inicializálása.
+    Itt hozzuk létre az exchange-eket és a queue-kat.
+    """
+    global connection, channel
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        )
+    )
+    channel = connection.channel()
+
+    # Dead-letter exchange létrehozása (ha még nem létezik)
+    channel.exchange_declare(exchange=DLX_NAME, exchange_type='fanout')
+
+    # Dead-letter queue létrehozása
+    channel.queue_declare(queue=DLQ_NAME)
+
+    # Dead-letter queue kötése a dead-letter exchange-hez
+    channel.queue_bind(exchange=DLX_NAME, queue=DLQ_NAME)
+
+    # Fő üzenetsor létrehozása dead-letter exchange-szel
+    channel.queue_declare(
+        queue=COLOR_QUEUE,
+        arguments={'x-dead-letter-exchange': DLX_NAME}
+    )
+
+
 class ColorService(ServiceBase):
     """
     SOAP webszolgáltatás, amely színeket fogad és továbbítja azokat az üzenetsorba.
@@ -58,8 +94,8 @@ class ColorService(ServiceBase):
         """
         Színeket fogad SOAP üzeneteken keresztül és továbbítja őket az üzenetsorba.
 
-        :param color: A szín neve (RED, GREEN vagy BLUE)
-        :return: Visszaigazolás az üzenet fogadásáról
+        :param color: A szín neve (RED, GREEN vagy BLUE).
+        :return: Visszaigazolás az üzenet fogadásáról.
         """
         logger.info(f"Received color: {color}")
 
@@ -68,44 +104,7 @@ class ColorService(ServiceBase):
             return f"Invalid color: {color}. Only RED, GREEN, or BLUE are supported."
 
         try:
-            # Kapcsolódás a RabbitMQ-hoz
-            """ nagy terhelés esetén az aszinkron alternatíva (pl. pika.SelectConnection) hatékonyabb lehet """
-            connection = pika.BlockingConnection(
-
-                pika.ConnectionParameters(
-                    host=RABBITMQ_HOST,
-                    port=RABBITMQ_PORT,
-                    credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
-                )
-            )
-            channel = connection.channel()
-            """
-            A RabbitMQ-val történő kommunikáció során a "csatorna" (channel) egy logikai kapcsolatot jelent 
-            a fizikai kapcsolaton belül. Azért kell csatornát létrehozni, mert:
-
-            Erőforrás-hatékonyság: Egy fizikai TCP kapcsolaton belül több logikai csatornát lehet létrehozni, 
-            ami sokkal erőforrás-hatékonyabb, mintha minden művelethez külön TCP kapcsolatot nyitnánk.
-            Párhuzamos kommunikáció: A csatornák lehetővé teszik, hogy egyidejűleg több kommunikációs folyamatot 
-            bonyolítsunk le ugyanazon a kapcsolaton.
-            Művelet-szeparáció: Különböző üzenetsorokkal vagy exchange-ekkel való kommunikációt különböző csatornákon 
-            keresztül kezelhetünk, ami elkülöníti a logikát.
-
-            A csatornát a connection.channel() hívással hozzuk létre, és minden RabbitMQ művelet 
-            (pl. üzenetsor létrehozása, üzenet küldése) ezen a csatornán keresztül történik.
-            """
-
-            # Dead-letter exchange létrehozása
-            channel.exchange_declare(exchange=DLX_NAME, exchange_type='fanout')
-
-            # Üzenet küldése az üzenetsorba
-            # Csak a sor létrehozása
-            channel.queue_declare(queue=COLOR_QUEUE,
-                                  arguments={
-                                      'x-dead-letter-exchange': DLX_NAME
-                                  }
-            )
-
-            # Üzenet küldése a default exchange-en
+            # A globális channel használata újranyitás helyett
             channel.basic_publish(
                 exchange='',  # Default exchange
                 routing_key=COLOR_QUEUE,  # A sor neve
@@ -114,31 +113,29 @@ class ColorService(ServiceBase):
                     headers={'COLOR': color}
                 )
             )
-
-            # Kapcsolat lezárása
-            connection.close()
-
             return f"Color {color} successfully sent to the message queue"
         except Exception as e:
             logger.error(f"Error sending color to queue: {e}")
             return f"Error sending color to queue: {e}"
-            # ezek a stringek válaszként mennek vissza a SOAP kliensnek.
+            # Ezek a stringek válaszként mennek vissza a SOAP kliensnek.
+
 
 def run_soap_server():
     """
     Elindítja a SOAP webszolgáltatást.
     """
+    # RabbitMQ setup egyszer, induláskor
+    setup_rabbitmq()
+
     # SOAP alkalmazás konfigurálása
-    application = Application([ColorService],
-                              tns='http://color.service.example',
-                              in_protocol=Soap11(validator='lxml'),
-                              out_protocol=Soap11())
+    application = Application(
+        [ColorService],
+        tns='http://color.service.example',
+        in_protocol=Soap11(validator='lxml'),
+        out_protocol=Soap11()
+    )
 
-    """ WSGI alkalmazás létrehozása
-        A WsgiApplication becsomagolja a SOAP alkalmazást egy WSGI-kompatibilis alkalmazásba, amely lehetővé teszi, 
-        hogy bármely WSGI-kompatibilis webszerver futtatni tudja.
-    """
-
+    # WSGI alkalmazás létrehozása
     wsgi_application = WsgiApplication(application)
 
     # WSGI szerver elindítása

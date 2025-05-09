@@ -14,6 +14,7 @@ SOAP_PORT = os.environ.get('SOAP_SERVICE_PORT', '8000')
 SOAP_WSDL_URL = f'http://{SOAP_HOST}:{SOAP_PORT}/?wsdl'
 
 
+
 def generate_random_color():
     """
     Véletlenszerűen választ egy színt a RED, GREEN és BLUE közül.
@@ -44,7 +45,7 @@ def run_color_producer():
             logger.info(f"Sent color: {color}, Response: {response}")
 
             # Várunk valamennyi másodpercet a következő küldésig
-            time.sleep(1)
+            time.sleep(.5)
 
         except Exception as e:
             logger.error(f"Error sending color: {e}")
